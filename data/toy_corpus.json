@@ -1,0 +1,34 @@
+[
+  {
+    "id": 1,
+    "text": "Urban vegetation reduces land surface temperature in densely populated cities."
+  },
+  {
+    "id": 2,
+    "text": "Impervious surfaces increase heat retention and contribute to urban heat islands."
+  },
+  {
+    "id": 3,
+    "text": "Tree canopy coverage is associated with lower daytime temperatures."
+  },
+  {
+    "id": 4,
+    "text": "Satellite imagery can measure land surface temperature using thermal infrared sensors."
+  },
+  {
+    "id": 5,
+    "text": "Green roofs provide insulation and can reduce building energy consumption."
+  },
+  {
+    "id": 6,
+    "text": "Higher NDVI values are associated with decreased land surface temperature."
+  },
+  {
+    "id": 7,
+    "text": "Dense urban development and low vegetation coverage contribute to elevated temperatures."
+  },
+  {
+    "id": 8,
+    "text": "Machine learning models can predict urban heat using satellite-derived environmental variables."
+  }
+]
