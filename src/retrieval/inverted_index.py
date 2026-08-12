@@ -55,4 +55,7 @@ class InvertedIndex:
 
         return result or set()
 
-    def document_frequency(self, )
+    def document_frequency(self, term):
+        return len(self.get_documents(term))
+
+    

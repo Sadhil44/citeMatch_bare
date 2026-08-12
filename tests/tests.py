@@ -1,6 +1,8 @@
 import json
+import math
 
 from src.retrieval.inverted_index import InvertedIndex
+from src.retrieval.tfidf import TFIDF
 from src.tokenizer import tokenize
 
 with open("data/toy_corpus.json") as f:
@@ -91,3 +93,44 @@ def test_search_unknown_term_returns_empty_set():
 def test_search_empty_query_returns_empty_set():
     index = _build_toy_index()
     assert index.search("") == set()
+
+
+def test_document_frequency():
+    index = _build_toy_index()
+    assert index.document_frequency("urban") == 4
+    assert index.document_frequency("heat") == 2
+    assert index.document_frequency("nonexistent") == 0
+
+
+def _build_toy_tfidf():
+    return TFIDF(_build_toy_index())
+
+
+def test_idf_of_common_term():
+    tfidf = _build_toy_tfidf()
+    assert math.isclose(tfidf.idf("urban"), math.log(8 / 4))
+
+
+def test_idf_of_rare_term():
+    tfidf = _build_toy_tfidf()
+    assert math.isclose(tfidf.idf("heat"), math.log(8 / 2))
+
+
+def test_idf_of_unseen_term_is_zero():
+    tfidf = _build_toy_tfidf()
+    assert tfidf.idf("nonexistent") == 0.0
+
+
+def test_score_combines_tf_and_idf():
+    tfidf = _build_toy_tfidf()
+    assert math.isclose(tfidf.score("heat", 2), 2 * math.log(8 / 2))
+
+
+def test_score_is_zero_when_term_absent_from_document():
+    tfidf = _build_toy_tfidf()
+    assert tfidf.score("urban", 3) == 0.0
+
+
+def test_score_is_zero_for_unseen_term():
+    tfidf = _build_toy_tfidf()
+    assert tfidf.score("nonexistent", 1) == 0.0
