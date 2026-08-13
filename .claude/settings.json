@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cd \"c:\\\\Users\\\\sadhi\\\\OneDrive\\\\Documents\\\\GitHub\\\\citeMatch_bare\" && mv src/retrieval/vecoterizer.py src/retrieval/vectorizer.py)"
+      "Bash(cd \"c:\\\\Users\\\\sadhi\\\\OneDrive\\\\Documents\\\\GitHub\\\\citeMatch_bare\" && mv src/retrieval/vecoterizer.py src/retrieval/vectorizer.py)",
+      "Bash(git status *)",
+      "Bash(git rm *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\sadhi\\OneDrive\\Documents\\GitHub\\citeMatch_bare\\src\\retrieval"
