@@ -3,6 +3,7 @@ import math
 
 from src.retrieval.inverted_index import InvertedIndex
 from src.retrieval.tfidf import TFIDF
+from src.retrieval.vectorizer import Vectorizer
 from src.tokenizer import tokenize
 
 with open("data/toy_corpus.json") as f:
@@ -134,3 +135,39 @@ def test_score_is_zero_when_term_absent_from_document():
 def test_score_is_zero_for_unseen_term():
     tfidf = _build_toy_tfidf()
     assert tfidf.score("nonexistent", 1) == 0.0
+
+
+def _build_toy_vectorizer():
+    return Vectorizer(_build_toy_tfidf())
+
+
+def test_vocabulary_is_sorted_and_covers_all_terms():
+    vectorizer = _build_toy_vectorizer()
+    assert vectorizer.vocabulary == sorted(vectorizer.vocabulary)
+    assert set(vectorizer.vocabulary) == set(vectorizer.tfidf.index.index.keys())
+
+
+def test_vectorize_length_matches_vocabulary():
+    vectorizer = _build_toy_vectorizer()
+    assert len(vectorizer.vectorize(1)) == len(vectorizer.vocabulary)
+
+
+def test_vectorize_matches_tfidf_score_at_term_position():
+    vectorizer = _build_toy_vectorizer()
+    vector = vectorizer.vectorize(1)
+    urban_index = vectorizer.vocabulary.index("urban")
+    assert vector[urban_index] == vectorizer.tfidf.score("urban", 1)
+
+
+def test_vectorize_is_zero_for_terms_absent_from_document():
+    vectorizer = _build_toy_vectorizer()
+    vector = vectorizer.vectorize(3)
+    heat_index = vectorizer.vocabulary.index("heat")
+    assert vector[heat_index] == 0.0
+
+
+def test_vectorize_all_covers_every_document():
+    vectorizer = _build_toy_vectorizer()
+    vectors = vectorizer.vectorize_all()
+    assert set(vectors.keys()) == vectorizer.tfidf.index.doc_ids
+    assert all(len(v) == len(vectorizer.vocabulary) for v in vectors.values())

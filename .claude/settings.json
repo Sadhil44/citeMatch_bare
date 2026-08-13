@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"c:\\\\Users\\\\sadhi\\\\OneDrive\\\\Documents\\\\GitHub\\\\citeMatch_bare\" && mv src/retrieval/vecoterizer.py src/retrieval/vectorizer.py)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\sadhi\\OneDrive\\Documents\\GitHub\\citeMatch_bare\\src\\retrieval"
+    ]
+  }
+}
