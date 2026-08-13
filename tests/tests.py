@@ -2,6 +2,8 @@ import json
 import math
 
 from src.retrieval.inverted_index import InvertedIndex
+from src.retrieval.search import SearchEngine, SearchResult
+from src.retrieval.similarity import cosine_similarity, dot_product, magnitude
 from src.retrieval.tfidf import TFIDF
 from src.retrieval.vectorizer import Vectorizer
 from src.tokenizer import tokenize
@@ -171,3 +173,77 @@ def test_vectorize_all_covers_every_document():
     vectors = vectorizer.vectorize_all()
     assert set(vectors.keys()) == vectorizer.tfidf.index.doc_ids
     assert all(len(v) == len(vectorizer.vocabulary) for v in vectors.values())
+
+
+def test_dot_product():
+    assert dot_product([1, 2, 3], [4, 5, 6]) == 32.0
+
+
+def test_magnitude():
+    assert magnitude([3, 4]) == 5.0
+
+
+def test_cosine_similarity_of_identical_vectors_is_one():
+    vectorizer = _build_toy_vectorizer()
+    vector = vectorizer.vectorize(1)
+    assert math.isclose(cosine_similarity(vector, vector), 1.0)
+
+
+def test_cosine_similarity_of_orthogonal_vectors_is_zero():
+    assert cosine_similarity([1, 0], [0, 1]) == 0.0
+
+
+def test_cosine_similarity_with_zero_vector_is_zero():
+    assert cosine_similarity([0, 0, 0], [1, 2, 3]) == 0.0
+
+
+def test_cosine_similarity_ranks_related_documents_higher():
+    vectorizer = _build_toy_vectorizer()
+    vectors = vectorizer.vectorize_all()
+    # doc 1 and doc 4 both discuss land surface temperature; doc 2 is about
+    # impervious surfaces/heat retention and shares less vocabulary with doc 1.
+    related = cosine_similarity(vectors[1], vectors[4])
+    unrelated = cosine_similarity(vectors[1], vectors[2])
+    assert related > unrelated
+
+
+def _build_toy_search_engine():
+    return SearchEngine(TOY_CORPUS, _build_toy_vectorizer())
+
+
+def test_search_returns_search_results():
+    engine = _build_toy_search_engine()
+    results = engine.search("urban heat")
+    assert all(isinstance(r, SearchResult) for r in results)
+
+
+def test_search_respects_k():
+    engine = _build_toy_search_engine()
+    assert len(engine.search("urban heat", k=3)) == 3
+    assert len(engine.search("urban heat", k=2)) == 2
+
+
+def test_search_default_k_is_five():
+    engine = _build_toy_search_engine()
+    assert len(engine.search("urban")) == 5
+
+
+def test_search_results_sorted_descending():
+    engine = _build_toy_search_engine()
+    results = engine.search("urban heat", k=8)
+    scores = [r.score for r in results]
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_search_ranks_best_matching_document_first():
+    engine = _build_toy_search_engine()
+    results = engine.search("urban heat", k=1)
+    # doc 2 mentions "heat" twice and "urban" once, the strongest match
+    # for this query among the toy corpus.
+    assert results[0].document_id == 2
+
+
+def test_search_empty_query_scores_everything_zero():
+    engine = _build_toy_search_engine()
+    results = engine.search("", k=8)
+    assert all(r.score == 0.0 for r in results)

@@ -1,3 +1,8 @@
+from collections import Counter
+
+from src.tokenizer import tokenize
+
+
 class Vectorizer:
 
     def __init__(self, tfidf):
@@ -12,3 +17,11 @@ class Vectorizer:
             doc_id: self.vectorize(doc_id)
             for doc_id in sorted(self.tfidf.index.doc_ids)
         }
+
+
+def vectorize_query(query, vectorizer):
+    term_counts = Counter(tokenize(query))
+    return [
+        term_counts.get(term, 0) * vectorizer.tfidf.idf(term)
+        for term in vectorizer.vocabulary
+    ]
