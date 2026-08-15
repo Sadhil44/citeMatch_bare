@@ -2,6 +2,12 @@ import json
 import math
 
 from src.retrieval.bm25 import BM25
+from src.retrieval.evaluation import (
+    evaluate_retriever,
+    precision_at_k,
+    recall_at_k,
+    reciprocal_rank,
+)
 from src.retrieval.inverted_index import InvertedIndex
 from src.retrieval.search import BM25SearchEngine, SearchEngine, SearchResult
 from src.retrieval.similarity import cosine_similarity, dot_product, magnitude
@@ -330,3 +336,51 @@ def test_bm25_search_engine_ranks_best_matching_document_first():
     engine = _build_toy_bm25_search_engine()
     results = engine.search("urban heat", k=1)
     assert results[0].document_id == 2
+
+
+def test_precision_at_k():
+    assert precision_at_k([1, 2, 3], [2, 3, 9], 3) == 2 / 3
+
+
+def test_precision_at_k_zero_k_is_zero():
+    assert precision_at_k([1, 2, 3], [2], 0) == 0.0
+
+
+def test_recall_at_k():
+    assert recall_at_k([1, 2, 3], [2, 3, 9], 3) == 2 / 3
+
+
+def test_recall_at_k_no_relevant_docs_is_zero():
+    assert recall_at_k([1, 2, 3], [], 3) == 0.0
+
+
+def test_reciprocal_rank_finds_first_relevant_hit():
+    assert reciprocal_rank([1, 2, 3], [3]) == 1 / 3
+
+
+def test_reciprocal_rank_no_relevant_hit_is_zero():
+    assert reciprocal_rank([1, 2, 3], [9]) == 0.0
+
+
+TOY_EVAL_QUERIES = [
+    {"query": "urban heat", "relevant_docs": [2, 8]},
+    {"query": "land surface temperature", "relevant_docs": [1, 4, 6]},
+]
+
+
+def test_evaluate_retriever_tfidf():
+    metrics = evaluate_retriever(TOY_EVAL_QUERIES, TOY_CORPUS, "tfidf", k=5)
+    assert metrics == {"precision@5": 0.5, "recall@5": 1.0, "mrr": 1.0}
+
+
+def test_evaluate_retriever_bm25():
+    metrics = evaluate_retriever(TOY_EVAL_QUERIES, TOY_CORPUS, "bm25", k=5)
+    assert metrics == {"precision@5": 0.5, "recall@5": 1.0, "mrr": 1.0}
+
+
+def test_evaluate_retriever_unknown_method_raises():
+    try:
+        evaluate_retriever(TOY_EVAL_QUERIES, TOY_CORPUS, "nonexistent", k=5)
+        assert False, "expected ValueError"
+    except ValueError:
+        pass
