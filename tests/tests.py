@@ -3,7 +3,7 @@ import math
 
 from src.retrieval.bm25 import BM25
 from src.retrieval.inverted_index import InvertedIndex
-from src.retrieval.search import SearchEngine, SearchResult
+from src.retrieval.search import BM25SearchEngine, SearchEngine, SearchResult
 from src.retrieval.similarity import cosine_similarity, dot_product, magnitude
 from src.retrieval.tfidf import TFIDF
 from src.retrieval.vectorizer import Vectorizer
@@ -300,3 +300,33 @@ def test_bm25_search_empty_query_scores_everything_zero():
     bm25 = _build_toy_bm25()
     results = bm25.search("", k=8)
     assert all(r.score == 0.0 for r in results)
+
+
+def _build_toy_bm25_search_engine():
+    return BM25SearchEngine(TOY_CORPUS, _build_toy_bm25())
+
+
+def test_bm25_search_engine_returns_search_results_with_text():
+    engine = _build_toy_bm25_search_engine()
+    results = engine.search("urban heat")
+    assert all(isinstance(r, SearchResult) for r in results)
+    assert all(r.text for r in results)
+
+
+def test_bm25_search_engine_matches_raw_bm25_score():
+    bm25 = _build_toy_bm25()
+    engine = BM25SearchEngine(TOY_CORPUS, bm25)
+    results = engine.search("urban heat", k=8)
+    for result in results:
+        assert result.score == bm25.score(tokenize("urban heat"), result.document_id)
+
+
+def test_bm25_search_engine_respects_k():
+    engine = _build_toy_bm25_search_engine()
+    assert len(engine.search("urban heat", k=3)) == 3
+
+
+def test_bm25_search_engine_ranks_best_matching_document_first():
+    engine = _build_toy_bm25_search_engine()
+    results = engine.search("urban heat", k=1)
+    assert results[0].document_id == 2
