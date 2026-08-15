@@ -1,6 +1,7 @@
 import json
 import math
 
+from src.retrieval.bm25 import BM25
 from src.retrieval.inverted_index import InvertedIndex
 from src.retrieval.search import SearchEngine, SearchResult
 from src.retrieval.similarity import cosine_similarity, dot_product, magnitude
@@ -246,4 +247,56 @@ def test_search_ranks_best_matching_document_first():
 def test_search_empty_query_scores_everything_zero():
     engine = _build_toy_search_engine()
     results = engine.search("", k=8)
+    assert all(r.score == 0.0 for r in results)
+
+
+def _build_toy_bm25():
+    return BM25.from_corpus(TOY_CORPUS)
+
+
+def test_bm25_document_frequency_matches_inverted_index():
+    bm25 = _build_toy_bm25()
+    index = _build_toy_index()
+    assert bm25.document_frequency["urban"] == index.document_frequency("urban")
+    assert bm25.document_frequency["heat"] == index.document_frequency("heat")
+
+
+def test_bm25_score_is_zero_when_no_query_terms_present():
+    bm25 = _build_toy_bm25()
+    assert bm25.score(["urban", "heat"], 3) == 0.0
+
+
+def test_bm25_score_is_zero_for_unseen_term():
+    bm25 = _build_toy_bm25()
+    assert bm25.score(["nonexistent"], 1) == 0.0
+
+
+def test_bm25_score_rewards_higher_term_frequency():
+    bm25 = _build_toy_bm25()
+    # doc 2 mentions "heat" twice, doc 8 once; both are similar length.
+    assert bm25.score(["heat"], 2) > bm25.score(["heat"], 8)
+
+
+def test_bm25_search_respects_k():
+    bm25 = _build_toy_bm25()
+    assert len(bm25.search("urban heat", k=3)) == 3
+    assert len(bm25.search("urban heat", k=8)) == 8
+
+
+def test_bm25_search_results_sorted_descending():
+    bm25 = _build_toy_bm25()
+    results = bm25.search("urban heat", k=8)
+    scores = [r.score for r in results]
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_bm25_search_ranks_best_matching_document_first():
+    bm25 = _build_toy_bm25()
+    results = bm25.search("urban heat", k=1)
+    assert results[0].document_id == 2
+
+
+def test_bm25_search_empty_query_scores_everything_zero():
+    bm25 = _build_toy_bm25()
+    results = bm25.search("", k=8)
     assert all(r.score == 0.0 for r in results)
