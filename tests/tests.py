@@ -9,6 +9,7 @@ from src.retrieval.evaluation import (
     recall_at_k,
     reciprocal_rank,
 )
+from src.retrieval.hybrid_retriever import HybridRetriever, min_max_normalize
 from src.retrieval.inverted_index import InvertedIndex
 from src.retrieval.search import BM25SearchEngine, SearchEngine, SearchResult
 from src.retrieval.similarity import cosine_similarity, dot_product, magnitude
@@ -407,3 +408,49 @@ def test_dense_retriever_beats_bm25_on_a_paraphrased_query():
     dense = DenseRetriever.from_corpus(TOY_CORPUS)
     dense_top = dense.search(query, k=1)[0][0]
     assert dense_top in relevant_docs
+
+
+def test_min_max_normalize_empty():
+    assert min_max_normalize({}) == {}
+
+
+def test_min_max_normalize_equal_values_all_zero():
+    assert min_max_normalize({1: 5, 2: 5}) == {1: 0.0, 2: 0.0}
+
+
+def test_min_max_normalize_scales_to_unit_range():
+    assert min_max_normalize({1: 0, 2: 5, 3: 10}) == {1: 0.0, 2: 0.5, 3: 1.0}
+
+
+def _build_toy_hybrid():
+    return HybridRetriever.from_corpus(TOY_CORPUS)
+
+
+def test_hybrid_search_respects_k():
+    hybrid = _build_toy_hybrid()
+    assert len(hybrid.search("urban heat", k=3)) == 3
+
+
+def test_hybrid_search_results_sorted_descending():
+    hybrid = _build_toy_hybrid()
+    results = hybrid.search("urban heat", k=8)
+    scores = [score for _, score in results]
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_hybrid_search_ranks_best_matching_document_first():
+    hybrid = _build_toy_hybrid()
+    results = hybrid.search("urban heat", k=1)
+    assert results[0][0] == 2
+
+
+def test_hybrid_alpha_zero_matches_bm25_top_result():
+    hybrid = HybridRetriever.from_corpus(TOY_CORPUS, alpha=0.0)
+    bm25 = BM25.from_corpus(TOY_CORPUS)
+    assert hybrid.search("urban heat", k=1)[0][0] == bm25.search("urban heat", k=1)[0].document_id
+
+
+def test_hybrid_alpha_one_matches_dense_top_result():
+    hybrid = HybridRetriever.from_corpus(TOY_CORPUS, alpha=1.0)
+    dense = DenseRetriever.from_corpus(TOY_CORPUS)
+    assert hybrid.search("urban heat", k=1)[0][0] == dense.search("urban heat", k=1)[0][0]
