@@ -2,6 +2,7 @@ import json
 import math
 
 from src.retrieval.bm25 import BM25
+from src.retrieval.dense_retrieval import DenseRetriever
 from src.retrieval.evaluation import (
     evaluate_retriever,
     precision_at_k,
@@ -384,3 +385,25 @@ def test_evaluate_retriever_unknown_method_raises():
         assert False, "expected ValueError"
     except ValueError:
         pass
+
+
+def test_dense_retriever_beats_bm25_on_a_paraphrased_query():
+    # A paraphrase of the urban-heat documents (1, 2, 7, 8) that shares no
+    # meaningful vocabulary with the corpus -- the only overlapping token is
+    # the stopword "and". BM25 has nothing real to match on and its top
+    # result ends up driven by that stopword coincidence, landing on an
+    # unrelated document. Dense retrieval has no trouble finding a relevant
+    # document since it compares meaning, not surface tokens.
+    query = (
+        "Concrete and asphalt trap warmth, making metropolitan zones "
+        "significantly hotter than nearby countryside."
+    )
+    relevant_docs = {1, 2, 7, 8}
+
+    bm25 = BM25.from_corpus(TOY_CORPUS)
+    bm25_top = bm25.search(query, k=1)[0].document_id
+    assert bm25_top not in relevant_docs
+
+    dense = DenseRetriever.from_corpus(TOY_CORPUS)
+    dense_top = dense.search(query, k=1)[0][0]
+    assert dense_top in relevant_docs
