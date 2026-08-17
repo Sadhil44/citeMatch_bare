@@ -2,6 +2,7 @@ import json
 import math
 
 from src.retrieval.bm25 import BM25
+from src.retrieval.cross_encoder_reranker import CrossEncoderReranker
 from src.retrieval.dense_retrieval import DenseRetriever
 from src.retrieval.evaluation import (
     evaluate_retriever,
@@ -454,3 +455,88 @@ def test_hybrid_alpha_one_matches_dense_top_result():
     hybrid = HybridRetriever.from_corpus(TOY_CORPUS, alpha=1.0)
     dense = DenseRetriever.from_corpus(TOY_CORPUS)
     assert hybrid.search("urban heat", k=1)[0][0] == dense.search("urban heat", k=1)[0][0]
+
+
+_TOY_RERANKER = None
+
+
+def _build_toy_reranker():
+    global _TOY_RERANKER
+    if _TOY_RERANKER is None:
+        _TOY_RERANKER = CrossEncoderReranker()
+    return _TOY_RERANKER
+
+
+def _toy_documents_by_id():
+    return {document["id"]: document["text"] for document in TOY_CORPUS}
+
+
+def _toy_bm25_candidates(query, k=8):
+    bm25 = BM25.from_corpus(TOY_CORPUS)
+    return [(r.document_id, r.score) for r in bm25.search(query, k=k)]
+
+
+def test_rerank_preserves_candidate_doc_ids():
+    reranker = _build_toy_reranker()
+    documents = _toy_documents_by_id()
+    candidates = _toy_bm25_candidates("urban heat")
+
+    reranked = reranker.rerank("urban heat", candidates, documents, k=8)
+
+    assert {doc_id for doc_id, _ in reranked} == {doc_id for doc_id, _ in candidates}
+
+
+def test_rerank_results_sorted_descending():
+    reranker = _build_toy_reranker()
+    documents = _toy_documents_by_id()
+    candidates = _toy_bm25_candidates("urban heat")
+
+    reranked = reranker.rerank("urban heat", candidates, documents, k=8)
+    scores = [score for _, score in reranked]
+
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_rerank_respects_k():
+    reranker = _build_toy_reranker()
+    documents = _toy_documents_by_id()
+    candidates = _toy_bm25_candidates("urban heat")
+
+    assert len(reranker.rerank("urban heat", candidates, documents, k=3)) == 3
+
+
+def test_rerank_ranks_relevant_document_first():
+    reranker = _build_toy_reranker()
+    documents = _toy_documents_by_id()
+    candidates = _toy_bm25_candidates("urban heat")
+
+    reranked = reranker.rerank("urban heat", candidates, documents, k=1)
+
+    # docs 2 and 8 are the only two that mention both "urban" and "heat".
+    assert reranked[0][0] in {2, 8}
+
+
+def test_evaluate_retriever_with_reranker_matches_shape_of_plain_evaluation():
+    metrics = evaluate_retriever(
+        TOY_EVAL_QUERIES, TOY_CORPUS, "bm25", k=5, reranker=_build_toy_reranker()
+    )
+    assert set(metrics.keys()) == {"precision@5", "recall@5", "mrr"}
+    assert metrics["recall@5"] == 1.0
+    assert metrics["mrr"] == 1.0
+
+
+def test_evaluate_retriever_reranker_actually_changes_ranking():
+    # BM25 alone ranks doc 2 first for "urban heat"; the cross-encoder
+    # reranker reorders the same candidate pool and puts doc 8 first.
+    engine = BM25SearchEngine(TOY_CORPUS, BM25.from_corpus(TOY_CORPUS))
+    bm25_top = engine.search("urban heat", k=1)[0].document_id
+
+    queries = [{"query": "urban heat", "relevant_docs": [8]}]
+    without_rerank = evaluate_retriever(queries, TOY_CORPUS, "bm25", k=1)
+    with_rerank = evaluate_retriever(
+        queries, TOY_CORPUS, "bm25", k=1, reranker=_build_toy_reranker()
+    )
+
+    assert bm25_top == 2
+    assert without_rerank["mrr"] == 0.0
+    assert with_rerank["mrr"] == 1.0

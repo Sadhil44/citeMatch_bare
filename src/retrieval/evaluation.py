@@ -57,8 +57,9 @@ def build_search_engine(documents, method):
 
     raise ValueError(f"Unknown method: {method}")
 
-def evaluate_retriever(evaluation_queries, documents, method, k=5):
+def evaluate_retriever(evaluation_queries, documents, method, k=5, reranker=None, candidate_k=20):
     engine = build_search_engine(documents, method)
+    documents_by_id = {document["id"]: document["text"] for document in documents}
 
     precision_scores = []
     recall_scores = []
@@ -68,9 +69,14 @@ def evaluate_retriever(evaluation_queries, documents, method, k=5):
         query = example["query"]
         relevant_docs = example["relevant_docs"]
 
-        results = engine.search(query, k=k)
-
-        retrieved_docs = [result.document_id for result in results]
+        if reranker is None:
+            results = engine.search(query, k=k)
+            retrieved_docs = [result.document_id for result in results]
+        else:
+            candidates = engine.search(query, k=candidate_k)
+            candidate_pairs = [(result.document_id, result.score) for result in candidates]
+            reranked = reranker.rerank(query, candidate_pairs, documents_by_id, k=k)
+            retrieved_docs = [doc_id for doc_id, _ in reranked]
 
         precision_scores.append(precision_at_k(retrieved_docs, relevant_docs, k))
         recall_scores.append(recall_at_k(retrieved_docs, relevant_docs, k))
