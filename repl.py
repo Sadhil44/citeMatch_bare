@@ -10,7 +10,7 @@ from src.retrieval.search import SearchEngine
 from src.retrieval.tfidf import TFIDF
 from src.retrieval.vectorizer import Vectorizer
 
-docs = json.load(open(REPO_ROOT / "data" / "toy_corpus.json"))
+docs = json.load(open(REPO_ROOT / "src" / "data" / "toy_corpus.json"))
 
 idx = InvertedIndex()
 idx.build(docs)

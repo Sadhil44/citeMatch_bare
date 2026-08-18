@@ -12,13 +12,14 @@ from src.retrieval.evaluation import (
 )
 from src.retrieval.hybrid_retriever import HybridRetriever, min_max_normalize
 from src.retrieval.inverted_index import InvertedIndex
+from src.retrieval.reranked_search import RerankedSearch
 from src.retrieval.search import BM25SearchEngine, SearchEngine, SearchResult
 from src.retrieval.similarity import cosine_similarity, dot_product, magnitude
 from src.retrieval.tfidf import TFIDF
 from src.retrieval.vectorizer import Vectorizer
 from src.tokenizer import tokenize
 
-with open("data/toy_corpus.json") as f:
+with open("src/data/toy_corpus.json") as f:
     TOY_CORPUS = json.load(f)
 
 
@@ -540,3 +541,34 @@ def test_evaluate_retriever_reranker_actually_changes_ranking():
     assert bm25_top == 2
     assert without_rerank["mrr"] == 0.0
     assert with_rerank["mrr"] == 1.0
+
+
+def _build_toy_reranked_search():
+    return RerankedSearch.from_corpus(TOY_CORPUS, reranker=_build_toy_reranker())
+
+
+def test_reranked_search_respects_top_k():
+    retriever = _build_toy_reranked_search()
+    assert len(retriever.search("urban heat", retrieve_k=8, top_k=3)) == 3
+
+
+def test_reranked_search_results_sorted_descending():
+    retriever = _build_toy_reranked_search()
+    results = retriever.search("urban heat", retrieve_k=8, top_k=8)
+    scores = [score for _, score in results]
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_reranked_search_ranks_relevant_document_first():
+    retriever = _build_toy_reranked_search()
+    results = retriever.search("urban heat", retrieve_k=8, top_k=1)
+    # docs 2 and 8 are the only two that mention both "urban" and "heat".
+    assert results[0][0] in {2, 8}
+
+
+def test_reranked_search_retrieve_k_limits_candidate_pool():
+    retriever = _build_toy_reranked_search()
+    # only 2 candidates are handed to the reranker, so only those 2 doc ids
+    # can possibly appear in the output even when top_k asks for more.
+    results = retriever.search("urban heat", retrieve_k=2, top_k=8)
+    assert len(results) == 2

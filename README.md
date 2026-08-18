@@ -28,8 +28,12 @@ src/
     dense_retrieval.py      DenseRetriever: sentence-transformer embeddings + cosine search
     search.py               SearchEngine (tf-idf + cosine) and BM25SearchEngine, both returning SearchResult
     evaluation.py           precision_at_k, recall_at_k, reciprocal_rank, evaluate_retriever
-data/
-  toy_corpus.json           8-document toy corpus used throughout the tests
+  data/
+    toy_corpus.json          8-document toy corpus used throughout the tests
+    openalex_client.py       search_works: query the OpenAlex API for papers
+    paper_corpus.py          build_corpus: normalize raw papers into {"id", "text"} + metadata
+    build_real_corpus.py     fetches papers from OpenAlex and saves them to real_papers.json
+    load_real_corpus.py      load_real_corpus(): loads a saved real_papers.json into a corpus
 tests/
   tests.py                  full test suite
 repl.py                     interactive shell preloaded with an indexed toy corpus
@@ -54,7 +58,7 @@ import json
 from src.retrieval.bm25 import BM25
 from src.retrieval.dense_retrieval import DenseRetriever
 
-docs = json.load(open("data/toy_corpus.json"))
+docs = json.load(open("src/data/toy_corpus.json"))
 
 bm25 = BM25.from_corpus(docs)
 bm25.search("urban heat")
