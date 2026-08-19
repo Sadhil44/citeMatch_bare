@@ -1,0 +1,20 @@
+[
+  {
+    "query": "does vegetation reduce urban temperature",
+    "relevant_docs": [
+      "W2066302908"
+    ]
+  },
+  {
+    "query": "urban heat island mitigation strategies",
+    "relevant_docs": []
+  },
+  {
+    "query": "measuring land surface temperature with satellite imagery",
+    "relevant_docs": []
+  },
+  {
+    "query": "machine learning for scientific literature retrieval",
+    "relevant_docs": []
+  }
+]

@@ -1,15 +1,16 @@
 import json
 import math
 
-from src.retrieval.bm25 import BM25
-from src.retrieval.cross_encoder_reranker import CrossEncoderReranker
-from src.retrieval.dense_retrieval import DenseRetriever
-from src.retrieval.evaluation import (
+from src.evaluation.evaluation import (
     evaluate_retriever,
     precision_at_k,
     recall_at_k,
     reciprocal_rank,
 )
+from src.evaluation.label_queries import load_queries, parse_selection
+from src.retrieval.bm25 import BM25
+from src.retrieval.cross_encoder_reranker import CrossEncoderReranker
+from src.retrieval.dense_retrieval import DenseRetriever
 from src.retrieval.hybrid_retriever import HybridRetriever, min_max_normalize
 from src.retrieval.inverted_index import InvertedIndex
 from src.retrieval.reranked_search import RerankedSearch
@@ -572,3 +573,50 @@ def test_reranked_search_retrieve_k_limits_candidate_pool():
     # can possibly appear in the output even when top_k asks for more.
     results = retriever.search("urban heat", retrieve_k=2, top_k=8)
     assert len(results) == 2
+
+
+_LABEL_QUERIES_RESULTS = [
+    {"id": "P1", "score": 0.9},
+    {"id": "P2", "score": 0.7},
+    {"id": "P3", "score": 0.5},
+]
+
+
+def test_parse_selection_empty_input_means_no_relevant_docs():
+    assert parse_selection("", _LABEL_QUERIES_RESULTS) == []
+    assert parse_selection("   ", _LABEL_QUERIES_RESULTS) == []
+
+
+def test_parse_selection_single_index():
+    assert parse_selection("2", _LABEL_QUERIES_RESULTS) == ["P2"]
+
+
+def test_parse_selection_multiple_indexes():
+    assert parse_selection("1,3", _LABEL_QUERIES_RESULTS) == ["P1", "P3"]
+
+
+def test_parse_selection_tolerates_whitespace():
+    assert parse_selection(" 1 , 3 ", _LABEL_QUERIES_RESULTS) == ["P1", "P3"]
+
+
+def test_parse_selection_out_of_range_raises():
+    try:
+        parse_selection("5", _LABEL_QUERIES_RESULTS)
+        assert False, "expected ValueError"
+    except ValueError:
+        pass
+
+
+def test_parse_selection_zero_raises():
+    try:
+        parse_selection("0", _LABEL_QUERIES_RESULTS)
+        assert False, "expected ValueError"
+    except ValueError:
+        pass
+
+
+def test_load_queries_returns_seed_queries():
+    queries = load_queries()
+    assert isinstance(queries, list)
+    assert len(queries) > 0
+    assert all("query" in example and "relevant_docs" in example for example in queries)
