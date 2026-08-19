@@ -7,7 +7,8 @@ from src.evaluation.evaluation import (
     recall_at_k,
     reciprocal_rank,
 )
-from src.evaluation.label_queries import load_queries, parse_selection
+from src.evaluation.pool_candidates import get_candidate_pool
+from src.evaluation.query_store import load_queries, parse_selection
 from src.retrieval.bm25 import BM25
 from src.retrieval.cross_encoder_reranker import CrossEncoderReranker
 from src.retrieval.dense_retrieval import DenseRetriever
@@ -575,33 +576,29 @@ def test_reranked_search_retrieve_k_limits_candidate_pool():
     assert len(results) == 2
 
 
-_LABEL_QUERIES_RESULTS = [
-    {"id": "P1", "score": 0.9},
-    {"id": "P2", "score": 0.7},
-    {"id": "P3", "score": 0.5},
-]
+_LABEL_QUERIES_IDS = ["P1", "P2", "P3"]
 
 
 def test_parse_selection_empty_input_means_no_relevant_docs():
-    assert parse_selection("", _LABEL_QUERIES_RESULTS) == []
-    assert parse_selection("   ", _LABEL_QUERIES_RESULTS) == []
+    assert parse_selection("", _LABEL_QUERIES_IDS) == []
+    assert parse_selection("   ", _LABEL_QUERIES_IDS) == []
 
 
 def test_parse_selection_single_index():
-    assert parse_selection("2", _LABEL_QUERIES_RESULTS) == ["P2"]
+    assert parse_selection("2", _LABEL_QUERIES_IDS) == ["P2"]
 
 
 def test_parse_selection_multiple_indexes():
-    assert parse_selection("1,3", _LABEL_QUERIES_RESULTS) == ["P1", "P3"]
+    assert parse_selection("1,3", _LABEL_QUERIES_IDS) == ["P1", "P3"]
 
 
 def test_parse_selection_tolerates_whitespace():
-    assert parse_selection(" 1 , 3 ", _LABEL_QUERIES_RESULTS) == ["P1", "P3"]
+    assert parse_selection(" 1 , 3 ", _LABEL_QUERIES_IDS) == ["P1", "P3"]
 
 
 def test_parse_selection_out_of_range_raises():
     try:
-        parse_selection("5", _LABEL_QUERIES_RESULTS)
+        parse_selection("5", _LABEL_QUERIES_IDS)
         assert False, "expected ValueError"
     except ValueError:
         pass
@@ -609,7 +606,7 @@ def test_parse_selection_out_of_range_raises():
 
 def test_parse_selection_zero_raises():
     try:
-        parse_selection("0", _LABEL_QUERIES_RESULTS)
+        parse_selection("0", _LABEL_QUERIES_IDS)
         assert False, "expected ValueError"
     except ValueError:
         pass
@@ -620,3 +617,29 @@ def test_load_queries_returns_seed_queries():
     assert isinstance(queries, list)
     assert len(queries) > 0
     assert all("query" in example and "relevant_docs" in example for example in queries)
+
+
+def _build_toy_hybrid_for_pooling():
+    return HybridRetriever.from_corpus(TOY_CORPUS)
+
+
+def test_get_candidate_pool_has_no_duplicates():
+    hybrid = _build_toy_hybrid_for_pooling()
+    candidate_ids = get_candidate_pool("urban heat", hybrid.bm25, hybrid.dense, hybrid, top_k=8)
+    assert len(candidate_ids) == len(set(candidate_ids))
+
+
+def test_get_candidate_pool_includes_bm25_top_hit():
+    hybrid = _build_toy_hybrid_for_pooling()
+    candidate_ids = get_candidate_pool("urban heat", hybrid.bm25, hybrid.dense, hybrid, top_k=3)
+    # doc 2 is BM25's top result for "urban heat"
+    assert 2 in candidate_ids
+
+
+def test_get_candidate_pool_unions_across_retrievers():
+    hybrid = _build_toy_hybrid_for_pooling()
+    bm25_only = {r.document_id for r in hybrid.bm25.search("urban heat", k=3)}
+    pool = set(get_candidate_pool("urban heat", hybrid.bm25, hybrid.dense, hybrid, top_k=3))
+    # the pool should be a superset of any single retriever's results, since
+    # it's a union across bm25, dense, and hybrid
+    assert bm25_only.issubset(pool)
